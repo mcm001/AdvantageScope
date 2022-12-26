@@ -5,6 +5,7 @@ import { Config3dField, Config3dRobot, Config3d_Rotation } from "../FRCData";
 import { AprilTag, Pose3d, rotation3dToQuaternion } from "../geometry";
 import { convert } from "../units";
 import Visualizer from "./Visualizer";
+import { serialize, deserialize } from "../../hub/dataSources/nt4/msgpack";
 
 export default class ThreeDimensionVisualizer implements Visualizer {
   private EFFICIENCY_MAX_FPS = 15;
@@ -84,12 +85,15 @@ export default class ThreeDimensionVisualizer implements Visualizer {
   private lastFieldTitle: string = "";
   private lastRobotTitle: string = "";
 
+  private ws: WebSocket = new WebSocket("ws://localhost:5800/websocket_data");
+  private sequenceId = 0;
+
   constructor(content: HTMLElement, canvas: HTMLCanvasElement, alert: HTMLElement) {
     this.content = content;
     this.canvas = canvas;
     this.alert = alert;
     this.alertCamera = alert.getElementsByTagName("span")[0];
-    this.renderer = new THREE.WebGLRenderer({ canvas });
+    this.renderer = new THREE.WebGLRenderer({ canvas, preserveDrawingBuffer: true });
     this.renderer.outputEncoding = THREE.sRGBEncoding;
     this.scene = new THREE.Scene();
 
@@ -687,6 +691,18 @@ export default class ThreeDimensionVisualizer implements Visualizer {
     this.scene.background = isDark ? new THREE.Color("#222222") : new THREE.Color("#ffffff");
     this.renderer.setPixelRatio(devicePixelRatio);
     this.renderer.render(this.scene, this.camera);
+
+    const imgData = this.canvas.toDataURL('image/jpeg');
+    const payload = { "wsSimulatedCameraData": { sequence: this.sequenceId, data: imgData } };
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const encoded = serialize(payload);
+      this.ws.send(encoded);
+    }
+
+    // var link = document.createElement("a");
+    // link.setAttribute("href", imgData);
+    // link.setAttribute("download", "foobar.png");
+    // link.click();
   }
 }
 
